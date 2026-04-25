@@ -1,7 +1,7 @@
 # CS32-Final-SSJ-
 2026 FIFA World Cup Simulator
 
-CS 32 Final Project
+**CS 32 Final Project**
 
 Our project simulates the real 2026 FIFA World Cup, the tournament co-hosted by Canada, Mexico, and the United States in summer 2026.
 
@@ -25,7 +25,7 @@ Each match is simulated using a weighted probability algorithm that accounts for
 
 Higher-ranked teams are significantly favored to win, but upsets are possible, just like in real soccer.
 
-The 2026 World Cup format
+**The 2026 World Cup format**
 
 For the first time in history, the World Cup features 48 teams (expanded from 32):
 
@@ -37,7 +37,7 @@ For the first time in history, the World Cup features 48 teams (expanded from 32
 
 •	Knockout bracket: Round of 32 → Round of 16 → Quarterfinals → Semifinals → Final
 
-The real 2026 groups
+**The real 2026 groups**
 
 Group A: Mexico, South Korea, South Africa, Czechia
 Group B: Canada, Switzerland, Qatar, Bosnia-Herzegovina
@@ -52,7 +52,7 @@ Group J: Argentina, Austria, Algeria, Jordan
 Group K: Portugal, Colombia, Uzbekistan, DR Congo
 Group L: England, Croatia, Panama, Ghana
 
-How FIFA rankings translate to team ratings
+**How FIFA rankings translate to team ratings**
 
 The program uses a function ranking_to_rating() that converts each team's FIFA ranking into a numeric rating:
 
@@ -62,7 +62,7 @@ The program uses a function ranking_to_rating() that converts each team's FIFA r
 
 This rating is then split into offense and defense with small random variation. In a match, we raise each team's rating to the 4th power before calculating win probability, which makes stronger teams clearly favored (a top 10 team beats a bottom-20 team 80% of the time) while still allowing realistic upsets.
 
-How to run it
+**How to run it**
 
 •	Make sure you have Python 3 installed.
 
@@ -74,7 +74,7 @@ How to run it
 
 The program runs fine without an API key, as the real 2026 draw and FIFA rankings are built into the code.
 
-New concepts used (beyond what we covered in class)
+**New concepts used (beyond what we covered in class)**
 
 •	The requests library - For making HTTP requests to the football-data.org API. Learned from https://requests.readthedocs.io/.
 
@@ -88,7 +88,7 @@ New concepts used (beyond what we covered in class)
 
 •	Mapping real-world rankings to numeric ratings - We wrote a piecewise function to convert FIFA ranks into ratings that produce realistic match outcomes.
 
-Team members
+**Team members**
 
 •	Andreas Savva
 
@@ -96,7 +96,7 @@ Team members
 
 •	Jason Broome
 
-Credits and external resources (AI tool usage)
+**Credits and external resources (AI tool usage)**
 
 We used Claude (Anthropic) as a coding assistant during development:
 
@@ -108,7 +108,7 @@ We used Claude (Anthropic) as a coding assistant during development:
 
 We did NOT use AI for the core probability algorithm - that is our own original design from FP Design. We also wrote the tournament bracket and rating-conversion logic ourselves.
 
-Data sources
+**Data sources**
 
 •	Group-stage draw: Official FIFA Final Draw
 Groups referenced via NBC Sports: https://www.nbcsports.com/soccer/news/2026-world-cup-groups-confirmed-full-draw-groups-details
@@ -117,7 +117,7 @@ Groups referenced via NBC Sports: https://www.nbcsports.com/soccer/news/2026-wor
 via ESPN and FIFA.com: https://www.espn.com/soccer/story/_/id/46664763/fifa-mens-top-50-world-rankings
 
 
-Testing
+**Testing**
 
 1.	100-tournament simulation - We ran the full tournament 100 times and counted champions. Results matched expectations:
 o	Top 6 FIFA-ranked teams (Argentina, France, Portugal, Brazil, Spain, England) won about 65% of all tournaments combined.
@@ -136,7 +136,8 @@ o	The lowest-ranked teams (Haiti, Curacao, New Zealand) never won, which is real
 
 7.	Third-place selection - Exactly 8 third-place teams advance, correctly ranked across all 12 groups.
 
-What's next
+
+**What's next**
 
 •	Use real match statistics to compute offense/defense ratings more precisely (e.g., weight recent World Cup qualifiers more heavily).
 
