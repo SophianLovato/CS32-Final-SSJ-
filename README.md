@@ -1,12 +1,17 @@
 # CS32-Final-SSJ-
 2026 FIFA World Cup Simulator
+
 CS 32 Final Project
+
 Our project simulates the real 2026 FIFA World Cup, the tournament co-hosted by Canada, Mexico, and the United States in summer 2026.
+
 It uses:
 •	The real group-stage draw from the FIFA Final Draw on December 5, 2025
 •	Real FIFA World Rankings as of April 1, 2026, so France is the top-ranked team, followed by Spain, Argentina, England, Portugal, and Brazil in the top 6
 •	Real team data from the football-data.org API
+
 The program then simulates the entire tournament, from group stage, Round of 32, Round of 16, Quarterfinals, Semifinals, and Final, to predict a champion.
+
 Each match is simulated using a weighted probability algorithm that accounts for:
 •	Offense and defense ratings derived from each team's FIFA ranking
 •	Host-nation home advantage for Canada, Mexico, and the USA (8% rating boost)
