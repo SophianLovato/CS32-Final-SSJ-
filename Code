@@ -1,0 +1,454 @@
+import random
+import requests
+
+# CONFIGURATION
+
+API_KEY = "API_HERE"
+BASE_URL = "https://api.football-data.org/v4"
+COMPETITION_CODE = 'WC'
+
+# The 2026 World Cup has three co-hosts — all get home-field advantage
+HOST_NATIONS = {'Canada', 'Mexico', 'USA'}
+
+# Match modifiers
+HOME_ADVANTAGE = 1.08   # Host nations get an 8% rating boost
+INJURY_PENALTY = 0.92   # Missing star player = 8% penalty
+
+# Tournament structure (new 48-team format for 2026)
+NUM_GROUPS = 12
+TEAMS_PER_GROUP = 4
+BEST_THIRDS_ADVANCING = 8
+
+
+# THE REAL 2026 WORLD CUP GROUPS
+# Source: FIFA Final Draw, Washington D.C., December 5, 2025
+
+WORLD_CUP_2026_GROUPS = {
+    'A': ['Mexico', 'South Korea', 'South Africa', 'Czechia'],
+    'B': ['Canada', 'Switzerland', 'Qatar', 'Bosnia-Herzegovina'],
+    'C': ['Brazil', 'Morocco', 'Scotland', 'Haiti'],
+    'D': ['USA', 'Paraguay', 'Australia', 'Turkiye'],
+    'E': ['Germany', 'Ecuador', 'Ivory Coast', 'Curacao'],
+    'F': ['Netherlands', 'Japan', 'Tunisia', 'Sweden'],
+    'G': ['Belgium', 'Iran', 'Egypt', 'New Zealand'],
+    'H': ['Spain', 'Uruguay', 'Saudi Arabia', 'Cape Verde'],
+    'I': ['France', 'Senegal', 'Norway', 'Iraq'],
+    'J': ['Argentina', 'Austria', 'Algeria', 'Jordan'],
+    'K': ['Portugal', 'Colombia', 'Uzbekistan', 'DR Congo'],
+    'L': ['England', 'Croatia', 'Panama', 'Ghana'],
+}
+
+# REAL FIFA WORLD RANKINGS (as of April 1, 2026)
+# Lower number = better team. E.g. France is #1.
+# Source: FIFA and ESPN rankings, April 2026
+
+FIFA_RANKINGS = {
+    # Top 10 (April 2026)
+    'France': 1,
+    'Spain': 2,
+    'Argentina': 3,
+    'England': 4,
+    'Portugal': 5,
+    'Brazil': 6,
+    'Netherlands': 7,
+    'Morocco': 8,
+    'Belgium': 9,
+    'Germany': 10,
+    # 11-20
+    'Croatia': 11,
+    'Senegal': 12,
+    'Colombia': 14,
+    'USA': 16,
+    'Mexico': 15,
+    'Uruguay': 17,
+    'Switzerland': 18,
+    'Japan': 19,
+    'Iran': 20,
+    # 21-40
+    'South Korea': 22,
+    'Ecuador': 23,
+    'Austria': 24,
+    'Turkiye': 25,
+    'Australia': 27,
+    'Algeria': 28,
+    'Canada': 30,
+    'Egypt': 31,
+    'Norway': 32,
+    'Panama': 33,
+    'Ivory Coast': 37,
+    'Scotland': 38,
+    'Paraguay': 40,
+    # 41-60
+    'Sweden': 42,
+    'Czechia': 43,
+    'Tunisia': 47,
+    'DR Congo': 48,
+    # Lower-ranked teams (outside top 50)
+    'Iraq': 58,
+    'Bosnia-Herzegovina': 65,
+    'Cape Verde': 69,
+    'Ghana': 74,
+    'Curacao': 82,
+    'Haiti': 83,
+    'New Zealand': 85,
+    # Estimates for remaining WC teams (based on regional context)
+    'Saudi Arabia': 55,
+    'Qatar': 60,
+    'Jordan': 70,
+    'Uzbekistan': 62,
+    'South Africa': 50,
+}
+
+
+# STEP 1: TEAM DATA FROM THE INTERNET
+
+def fetch_team_info():
+    """
+    Fetch team info from football-data.org. Returns a dict mapping
+    team name -> team info, or empty dict if the API fails.
+    This is used for potential future enhancements — the core
+    simulator uses hard-coded rankings.
+    """
+    url = f'{BASE_URL}/competitions/{COMPETITION_CODE}/teams'
+    headers = {'X-Auth-Token': API_KEY}
+
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+    except requests.exceptions.RequestException as e:
+        print(f'Could not reach the API: {e}')
+        return {}
+
+    if response.status_code != 200:
+        print(f'API returned an error (status {response.status_code})')
+        return {}
+
+    data = response.json()
+    team_info = {}
+    for team in data['teams']:
+        team_info[team['name']] = team
+    return team_info
+
+
+# STEP 2: CONVERT FIFA RANKING TO TEAM RATING
+
+def ranking_to_rating(rank):
+    """
+    Convert a FIFA ranking (1 = best) into a numeric rating.
+    Top-ranked teams get ratings around 92-95, lower-ranked teams
+    get ratings around 65-75.
+
+    We use a simple linear scale: rank 1 -> 95, and the rating
+    decreases as the rank number increases.
+    """
+    if rank <= 5:
+        return 95 - (rank - 1) * 1
+    elif rank <= 15:
+        return 90 - (rank - 5) * 0.8
+    elif rank <= 30:
+        return 82 - (rank - 15) * 0.6
+    elif rank <= 60:
+        return 73 - (rank - 30) * 0.3
+    else:
+        return max(60, 64 - (rank - 60) * 0.15)
+
+
+def build_team(team_name):
+    """
+    Build a team dictionary using the team's real FIFA ranking.
+    Offense and defense are derived from the base rating with small
+    random variation (some teams are more attack-minded, some more
+    defense-minded).
+    """
+    # Look up the team's FIFA ranking (default to 80 if missing)
+    rank = FIFA_RANKINGS.get(team_name, 80)
+    base_rating = ranking_to_rating(rank)
+
+    # Split base rating into offense and defense with small variation
+    offense_variation = random.uniform(-3, 3)
+    defense_variation = random.uniform(-3, 3)
+
+    offense = round(base_rating + offense_variation, 1)
+    defense = round(base_rating + defense_variation, 1)
+
+    return {
+        'name': team_name,
+        'fifa_rank': rank,
+        'offense': offense,
+        'defense': defense,
+        'star_player_out': random.random() < 0.15,   # ~15% of teams
+        'points': 0,
+        'goals_for': 0,
+        'goals_against': 0,
+        'group': None,
+    }
+
+
+# STEP 3: CALCULATE EFFECTIVE MATCH RATING
+
+def calculate_rating(team):
+    """
+    Compute a team's effective rating for a match.
+    Combines offense and defense, then applies host and injury modifiers.
+    """
+    rating = (team['offense'] + team['defense']) / 2
+
+    # Host nations get home-field advantage
+    if team['name'] in HOST_NATIONS:
+        rating = rating * HOME_ADVANTAGE
+
+    # Penalty if star player is out
+    if team['star_player_out']:
+        rating = rating * INJURY_PENALTY
+
+    return rating
+
+
+# STEP 4: SIMULATE A SINGLE MATCH
+
+def simulate_match(team_a, team_b, allow_draw):
+    """
+    Simulate one match. Returns (result, score_a, score_b) where
+    result is 'A', 'B', or 'DRAW'.
+
+    We raise the ratings to a power > 1 before computing probability.
+    This amplifies the gap between strong and weak teams so upsets
+    are possible but the stronger team usually wins.
+    """
+    rating_a = calculate_rating(team_a)
+    rating_b = calculate_rating(team_b)
+
+    # Exponent > 1 means stronger teams are more favored than a linear
+    # ratio would suggest. A value of 4 gives reasonable soccer-like
+    # outcomes where a 90-rated team beats a 75-rated team ~80% of
+    # the time, but upsets still happen.
+    power = 4
+    weighted_a = rating_a ** power
+    weighted_b = rating_b ** power
+    prob_a = weighted_a / (weighted_a + weighted_b)
+
+    # Generate realistic scores
+    score_a = generate_score(prob_a)
+    score_b = generate_score(1 - prob_a)
+
+    if score_a > score_b:
+        result = 'A'
+    elif score_b > score_a:
+        result = 'B'
+    else:
+        # Tied
+        if allow_draw:
+            result = 'DRAW'
+        else:
+            # Knockout — simulate penalty shootout weighted by rating
+            if random.random() < prob_a:
+                result = 'A'
+                score_a += 1
+            else:
+                result = 'B'
+                score_b += 1
+
+    return result, score_a, score_b
+
+
+def generate_score(win_probability):
+    """
+    Generate a realistic soccer score (0-4 goals).
+    Higher win probability means more goals on average.
+    """
+    if win_probability > 0.7:
+        return random.choices([0, 1, 2, 3, 4], weights=[5, 20, 30, 30, 15])[0]
+    elif win_probability > 0.55:
+        return random.choices([0, 1, 2, 3, 4], weights=[10, 25, 30, 25, 10])[0]
+    elif win_probability > 0.4:
+        return random.choices([0, 1, 2, 3, 4], weights=[20, 35, 25, 15, 5])[0]
+    else:
+        return random.choices([0, 1, 2, 3, 4], weights=[35, 35, 20, 8, 2])[0]
+
+
+# STEP 5: BUILD GROUPS FROM THE REAL DRAW
+
+def build_tournament_groups():
+    """Build the tournament groups using the real 2026 World Cup draw."""
+    groups = {}
+    for group_letter, team_names in WORLD_CUP_2026_GROUPS.items():
+        group_teams = []
+        for name in team_names:
+            team = build_team(name)
+            team['group'] = group_letter
+            group_teams.append(team)
+        groups[group_letter] = group_teams
+    return groups
+
+
+# STEP 6: GROUP STAGE
+
+def play_group_match(team_a, team_b):
+    """Play one group match and update both teams' stats."""
+    result, score_a, score_b = simulate_match(team_a, team_b, allow_draw=True)
+
+    team_a['goals_for'] += score_a
+    team_a['goals_against'] += score_b
+    team_b['goals_for'] += score_b
+    team_b['goals_against'] += score_a
+
+    if result == 'A':
+        team_a['points'] += 3
+    elif result == 'B':
+        team_b['points'] += 3
+    else:
+        team_a['points'] += 1
+        team_b['points'] += 1
+
+
+def play_group_stage(groups):
+    """
+    Play all group-stage matches (round-robin within each group).
+    Returns (group_winners, runners_up, third_place).
+    """
+    group_winners = []
+    runners_up = []
+    third_place = []
+
+    for group_letter, group in groups.items():
+        print(f'\n--- GROUP {group_letter} ---')
+
+        for i in range(len(group)):
+            for j in range(i + 1, len(group)):
+                play_group_match(group[i], group[j])
+
+        # Sort by points, then goal difference, then goals scored
+        group.sort(
+            key=lambda t: (
+                t['points'],
+                t['goals_for'] - t['goals_against'],
+                t['goals_for'],
+            ),
+            reverse=True,
+        )
+
+        # Print standings
+        print(f"{'Team':<22}{'Rank':<6}{'Pts':<5}{'GF':<5}{'GA':<5}{'GD':<5}")
+        for team in group:
+            gd = team['goals_for'] - team['goals_against']
+            print(f"{team['name']:<22}#{team['fifa_rank']:<5}"
+                  f"{team['points']:<5}{team['goals_for']:<5}"
+                  f"{team['goals_against']:<5}{gd:<5}")
+
+        group_winners.append(group[0])
+        runners_up.append(group[1])
+        third_place.append(group[2])
+
+    return group_winners, runners_up, third_place
+
+
+def select_best_third_place_teams(third_place_teams):
+    """
+    Pick the 8 best third-place teams, ranked by points, goal
+    difference, then goals scored (real FIFA tiebreaker rules).
+    """
+    ranked = sorted(
+        third_place_teams,
+        key=lambda t: (
+            t['points'],
+            t['goals_for'] - t['goals_against'],
+            t['goals_for'],
+        ),
+        reverse=True,
+    )
+    return ranked[:BEST_THIRDS_ADVANCING]
+
+
+# STEP 7: KNOCKOUT STAGE
+
+def play_knockout_round(teams, round_name):
+    """Play one knockout round. Returns list of winners."""
+    print(f'\n========== {round_name} ==========')
+    winners = []
+
+    for i in range(0, len(teams), 2):
+        team_a = teams[i]
+        team_b = teams[i + 1]
+
+        result, score_a, score_b = simulate_match(
+            team_a, team_b, allow_draw=False
+        )
+
+        if result == 'A':
+            winner = team_a
+        else:
+            winner = team_b
+
+        print(f"{team_a['name']} (#{team_a['fifa_rank']}) {score_a} - "
+              f"{score_b} {team_b['name']} (#{team_b['fifa_rank']})"
+              f"   -->  {winner['name']} advances")
+        winners.append(winner)
+
+    return winners
+
+
+# STEP 8: MAIN TOURNAMENT
+
+
+def run_tournament():
+    """Run the entire 2026 World Cup simulation from start to finish."""
+    print('=' * 60)
+    print('        2026 FIFA WORLD CUP SIMULATOR')
+    print('        Hosts: Canada, Mexico, USA')
+    print('        Using real FIFA rankings (April 2026)')
+    print('=' * 60)
+
+    # Try API (for possible future enhancements)
+    print('\nFetching team data from football-data.org...')
+    api_data = fetch_team_info()
+    if api_data:
+        print(f'Successfully loaded data for {len(api_data)} teams.')
+    else:
+        print('Proceeding with built-in FIFA rankings.')
+
+    # Build groups using the real draw + real rankings
+    groups = build_tournament_groups()
+
+    # GROUP STAGE
+    print('\n' + '=' * 60)
+    print('                  GROUP STAGE')
+    print('=' * 60)
+    winners, runners_up, thirds = play_group_stage(groups)
+
+    best_thirds = select_best_third_place_teams(thirds)
+    print('\n--- 8 BEST THIRD-PLACE TEAMS ADVANCING ---')
+    for team in best_thirds:
+        gd = team['goals_for'] - team['goals_against']
+        print(f"  {team['name']} (Group {team['group']}, "
+              f"FIFA #{team['fifa_rank']}) - "
+              f"{team['points']} pts, GD {gd:+d}")
+
+    # Round of 32
+    round_of_32 = winners + runners_up + best_thirds
+    random.shuffle(round_of_32)   # Simplified bracket pairing
+
+    # KNOCKOUT STAGE
+    print('\n' + '=' * 60)
+    print('                 KNOCKOUT STAGE')
+    print('=' * 60)
+    round_of_16 = play_knockout_round(round_of_32, 'ROUND OF 32')
+    quarterfinalists = play_knockout_round(round_of_16, 'ROUND OF 16')
+    semifinalists = play_knockout_round(quarterfinalists, 'QUARTERFINALS')
+    finalists = play_knockout_round(semifinalists, 'SEMIFINALS')
+    champion_list = play_knockout_round(finalists, 'FINAL')
+
+    # CHAMPION
+    champion = champion_list[0]
+    print('\n' + '=' * 60)
+    print(f'     2026 WORLD CUP CHAMPION: {champion["name"]}!')
+    print('=' * 60)
+    print(f"FIFA Ranking: #{champion['fifa_rank']}")
+    print(f"Group: {champion['group']}")
+    print(f"Offense: {champion['offense']}, Defense: {champion['defense']}")
+    if champion['name'] in HOST_NATIONS:
+        print('(Won on home soil!)')
+    if champion['star_player_out']:
+        print('(Won despite missing a star player!)')
+
+
+if __name__ == '__main__':
+    run_tournament()
