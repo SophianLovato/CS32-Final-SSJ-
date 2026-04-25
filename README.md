@@ -79,9 +79,7 @@ Team members
 •	Sophian Lovato
 •	Jason Broome
 
-Credits and external resources
-
-AI tool usage
+Credits and external resources (AI tool usage)
 
 We used Claude (Anthropic) as a coding assistant during development:
 
@@ -100,8 +98,6 @@ via ESPN and FIFA.com: https://www.espn.com/soccer/story/_/id/46664763/fifa-mens
 
 
 Testing
-
-We tested our code in these ways:
 
 1.	100-tournament simulation - We ran the full tournament 100 times and counted champions. Results matched expectations:
 o	Top 6 FIFA-ranked teams (Argentina, France, Portugal, Brazil, Spain, England) won about 65% of all tournaments combined.
