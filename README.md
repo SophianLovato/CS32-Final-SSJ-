@@ -77,20 +77,19 @@ If the API is unreachable or no key is provided, the program falls back to the h
 
 You'll need Python 3, plus a couple of packages:
 
-```pip install requests matplotlib```
+pip install requests matplotlib
 
 **To run a single tournament with full output:**
 
-```python simulator.py```
+python simulator.py
 
 **To run the parameter-sweep experiments and generate graphs:**
 
-```
 python experiments.py            # run all three experiments
 python experiments.py exponent   # just the rating-exponent sweep
 python experiments.py home       # just the home-advantage sweep
 python experiments.py injury     # just the injury-probability sweep
-```
+
 
 The experiments take a few minutes to run because each one simulates 100 full tournaments at every parameter value. The graphs are saved as `.png` files in the same directory.
 
