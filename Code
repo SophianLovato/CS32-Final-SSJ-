@@ -1,9 +1,3 @@
-"""
-2026 FIFA World Cup Simulator
-CS 32 Final Project - Andreas Savva, Sophian Lovato, Jason Broome
-
-"""
-
 import random
 import requests
 
