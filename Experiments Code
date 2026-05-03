@@ -1,0 +1,184 @@
+"""
+Parameter sweep experiments for the 2026 World Cup simulator.
+
+For each experiment we vary one parameter across a range of values,
+run many tournaments at each value, and graph the results with
+matplotlib. The line shows the mean across the runs at that parameter
+value, and the shaded band shows ±1 standard deviation.
+
+Usage:
+    python experiments.py            # run all experiments
+    python experiments.py exponent   # just the rating-exponent sweep
+    python experiments.py home       # just the home-advantage sweep
+    python experiments.py injury     # just the injury-probability sweep
+
+Generated graphs are saved as .png files in the current directory.
+"""
+
+import sys
+import statistics
+import matplotlib.pyplot as plt
+
+from simulator import SimConfig, run_tournament
+
+RUNS_PER_VALUE = 100
+
+
+def sweep_parameter(values, build_config, metric_fn, label):
+    means = []
+    stds = []
+
+    for v in values:
+        config = build_config(v)
+        results = []
+        for _ in range(RUNS_PER_VALUE):
+            outcome = run_tournament(config=config, verbose=False)
+            results.append(metric_fn(outcome))
+
+        means.append(statistics.mean(results))
+        stds.append(statistics.stdev(results) if len(results) > 1 else 0)
+        print(f'  {label}={v}: mean={means[-1]:.2f}, std={stds[-1]:.2f}')
+
+    return values, means, stds
+
+
+def plot_sweep(values, means, stds, xlabel, ylabel, title, filename):
+    """
+    Plot a parameter sweep: line through the means, shaded band for
+    ±1 standard deviation.
+    """
+    plt.figure(figsize=(9, 5.5))
+
+    # Convert to plain lists of floats so matplotlib's fill_between
+    # can do arithmetic on them
+    upper = [m + s for m, s in zip(means, stds)]
+    lower = [m - s for m, s in zip(means, stds)]
+
+    plt.plot(values, means, marker='o', linewidth=2,
+             color='#1f4e79', label='Mean across 100 tournaments')
+    plt.fill_between(values, lower, upper, alpha=0.25,
+                     color='#1f4e79', label='±1 standard deviation')
+
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(filename, dpi=120)
+    plt.close()
+    print(f'  Saved graph: {filename}\n')
+
+
+# EXPERIMENT 1: rating exponent vs. number of upsets
+
+def experiment_exponent():
+    print('Experiment 1: rating exponent vs. number of upsets')
+    values = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6]
+
+    def build(v):
+        return SimConfig(rating_exponent=v)
+
+    def metric(result):
+        return result['num_upsets']
+
+    xs, means, stds = sweep_parameter(
+        values, build, metric, label='exponent'
+    )
+    plot_sweep(
+        xs, means, stds,
+        xlabel='Rating exponent',
+        ylabel='Number of upsets per tournament',
+        title='Effect of the Rating Exponent on Tournament Upsets'
+              f'\n({RUNS_PER_VALUE} tournaments per value)',
+        filename='experiment_exponent.png',
+    )
+
+
+# EXPERIMENT 2: home advantage vs. host-nation advancement
+
+def experiment_home_advantage():
+    print('Experiment 2: home advantage vs. host championship rate')
+    values = [1.00, 1.02, 1.04, 1.06, 1.08, 1.10, 1.12, 1.14,
+              1.16, 1.18, 1.20]
+
+    HOST_NAMES = {'Canada', 'Mexico', 'USA'}
+
+    def build(v):
+        return SimConfig(home_advantage=v)
+
+    def metric(result):
+        # 1 if a host won the tournament, 0 otherwise.
+        # Means across runs become a championship rate (0–1).
+        return 1 if result['champion'] in HOST_NAMES else 0
+
+    xs, means, stds = sweep_parameter(
+        values, build, metric, label='home_adv'
+    )
+    plot_sweep(
+        xs, means, stds,
+        xlabel='Home-nation rating multiplier',
+        ylabel='Probability a host nation wins the World Cup',
+        title='Effect of Home Advantage on Host Championship Probability'
+              f'\n({RUNS_PER_VALUE} tournaments per value)',
+        filename='experiment_home_advantage.png',
+    )
+
+
+# EXPERIMENT 3: injury probability vs. champion FIFA ranking
+
+def experiment_injury():
+    """
+    Sweep the per-team injury probability from 0 to 0.5.
+    Measure: average FIFA ranking of the champion.
+    Higher injury rates should mean weaker champions on average,
+    because favorites are more often hobbled.
+    """
+    print('Experiment 3: injury probability vs. average champion rank')
+    values = [0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.50]
+
+    def build(v):
+        return SimConfig(injury_probability=v)
+
+    def metric(result):
+        return result['champion_rank']
+
+    xs, means, stds = sweep_parameter(
+        values, build, metric, label='injury_prob'
+    )
+    plot_sweep(
+        xs, means, stds,
+        xlabel='Probability that a team is missing a star player',
+        ylabel="Champion's FIFA ranking (lower = stronger champion)",
+        title='Effect of Injury Probability on the Strength of the Champion'
+              f'\n({RUNS_PER_VALUE} tournaments per value)',
+        filename='experiment_injury.png',
+    )
+
+
+# DRIVER
+
+EXPERIMENTS = {
+    'exponent': experiment_exponent,
+    'home': experiment_home_advantage,
+    'injury': experiment_injury,
+}
+
+
+def main():
+    if len(sys.argv) > 1:
+        name = sys.argv[1]
+        if name not in EXPERIMENTS:
+            print(f'Unknown experiment: {name}')
+            print(f'Available: {", ".join(EXPERIMENTS)}')
+            return
+        EXPERIMENTS[name]()
+    else:
+        print('Running all experiments. This will take a few minutes.\n')
+        for fn in EXPERIMENTS.values():
+            fn()
+        print('All experiments done.')
+
+
+if __name__ == '__main__':
+    main()
